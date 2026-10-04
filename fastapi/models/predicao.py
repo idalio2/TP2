@@ -8,4 +8,11 @@ class EntradaPredicao(BaseModel):
 
 
 class SaidaPredicao(BaseModel):
+    id: int
+    intencao: str
+
+
+class PredictionPublica(BaseModel):
+    id: int
+    texto: str
     intencao: str
