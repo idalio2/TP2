@@ -1,12 +1,23 @@
 from fastapi.testclient import TestClient
 
 from main import app
+from security.rate_limit import limiter
+from sqlite_database import criar_banco
 
+
+# Garante que o banco e os dados de teste existam
+criar_banco()
 
 client = TestClient(app)
 
 
+def resetar_rate_limit():
+    limiter.reset()
+
+
 def obter_token(username: str, password: str) -> str:
+    resetar_rate_limit()
+
     resposta = client.post(
         "/auth/token",
         data={
@@ -25,6 +36,36 @@ def test_acesso_sem_token():
         "/predict",
         json={
             "texto": "Quero um reembolso"
+        },
+    )
+
+    assert resposta.status_code == 401
+
+
+def test_login_com_credenciais_validas():
+    resetar_rate_limit()
+
+    resposta = client.post(
+        "/auth/token",
+        data={
+            "username": "admin",
+            "password": "infnet",
+        },
+    )
+
+    assert resposta.status_code == 200
+    assert "access_token" in resposta.json()
+    assert resposta.json()["token_type"] == "bearer"
+
+
+def test_login_com_senha_invalida():
+    resetar_rate_limit()
+
+    resposta = client.post(
+        "/auth/token",
+        data={
+            "username": "admin",
+            "password": "senha_errada",
         },
     )
 
@@ -65,3 +106,30 @@ def test_campo_extra_e_rejeitado():
     )
 
     assert resposta.status_code == 422
+
+
+def test_rate_limit_no_login():
+    resetar_rate_limit()
+
+    # As 10 primeiras requisições devem ser permitidas
+    for _ in range(10):
+        resposta = client.post(
+            "/auth/token",
+            data={
+                "username": "admin",
+                "password": "infnet",
+            },
+        )
+
+        assert resposta.status_code == 200
+
+    # A 11ª requisição deve ser bloqueada
+    resposta = client.post(
+        "/auth/token",
+        data={
+            "username": "admin",
+            "password": "infnet",
+        },
+    )
+
+    assert resposta.status_code == 429

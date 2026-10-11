@@ -6,3 +6,4 @@ sqlmodel
 slowapi
 pytest
 httpx
+scikit-learn    
